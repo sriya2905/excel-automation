@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Material Test Report Generator | SGIL</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="app-header" class="app-header hidden">
+        <div class="brand">
+          <strong>Material Test Report Generator</strong>
+          <span class="subtitle">SYNERGY GREEN INDUSTRIES LTD.</span>
+        </div>
+        <div class="user-bar">
+          <span id="header-username" class="user-pill"></span>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-logout">Logout</button>
+        </div>
+      </header>
+
+      <section id="screen-setup" class="screen hidden">
+        <div class="screen-header">
+          <h1>Initial Setup</h1>
+          <p class="subtitle">Set passwords for all four users (saved securely to backend/.env)</p>
+        </div>
+        <div class="card setup-card" id="setup-form"></div>
+        <p class="status-msg" id="setup-status"></p>
+      </section>
+
+      <section id="screen-login" class="screen hidden">
+        <div class="screen-header">
+          <h1>Material Test Report Generator</h1>
+          <p class="subtitle">SYNERGY GREEN INDUSTRIES LTD.</p>
+        </div>
+        <div class="card login-card">
+          <div class="form-group">
+            <label for="login-user">User</label>
+            <select id="login-user" aria-label="Select user">
+              <option value="Mahesh Chavan">Mahesh Chavan</option>
+              <option value="Rahul Karpe">Rahul Karpe</option>
+              <option value="Digember">Digember</option>
+              <option value="Quality Assurance">Quality Assurance</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" autocomplete="current-password" />
+          </div>
+          <button type="button" class="btn btn-primary btn-block" id="btn-login">Login</button>
+          <p class="status-msg" id="login-status"></p>
+        </div>
+      </section>
+
+      <section id="screen-upload" class="screen hidden">
+        <div class="screen-header">
+          <h1>Upload Data Files</h1>
+          <p class="subtitle">Metallurgy actuals · optional specification · test report template</p>
+        </div>
+        <div class="card">
+          <div class="upload-row">
+            <div class="upload-zone metal" id="zone-metallurgy" tabindex="0" role="button">
+              <span class="icon" aria-hidden="true">◆</span>
+              <h3>Metallurgy Sheet</h3>
+              <p>Required · actual chemistry &amp; mechanics</p>
+              <p class="file-name" id="metal-file-label">No file selected</p>
+              <input type="file" id="input-metallurgy" accept=".xlsx,.xls" hidden />
+            </div>
+            <div class="upload-zone template" id="zone-spec" tabindex="0" role="button">
+              <span class="icon" aria-hidden="true">◎</span>
+              <h3>Specification Sheet</h3>
+              <p>Optional · limits / ranges</p>
+              <p class="file-name" id="spec-file-label">Skipped</p>
+              <input type="file" id="input-spec" accept=".xlsx,.xls" hidden />
+            </div>
+            <div class="upload-zone metal" id="zone-template" tabindex="0" role="button">
+              <span class="icon" aria-hidden="true">◇</span>
+              <h3>Test Report Template</h3>
+              <p>Required · logo &amp; layout preserved</p>
+              <p class="file-name" id="template-file-label">No file selected</p>
+              <input type="file" id="input-template" accept=".xlsx,.xls" hidden />
+            </div>
+          </div>
+          <p class="status-msg" id="upload-status"></p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-primary" id="btn-proceed-upload" disabled>Proceed to Data Entry</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-entry" class="screen hidden">
+        <div class="screen-header">
+          <h1>Data Entry</h1>
+          <p class="subtitle">Search by Heat No and Casting Name</p>
+        </div>
+        <div class="card" style="max-width: 560px">
+          <p class="hint">Only these two fields are required for search. Other values load from the metallurgy sheet.</p>
+          <div class="form-group">
+            <label for="field-heat">Heat No</label>
+            <input type="text" id="field-heat" autocomplete="off" placeholder="e.g. A0226159" />
+          </div>
+          <div class="form-group">
+            <label for="field-casting">Casting Name</label>
+            <input type="text" id="field-casting" autocomplete="off" placeholder="e.g. Hollow Shaft" />
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost" id="btn-back-entry">Back</button>
+            <button type="button" class="btn btn-primary" id="btn-search">Search</button>
+          </div>
+          <p class="status-msg" id="entry-status"></p>
+        </div>
+      </section>
+
+      <section id="screen-preview" class="screen hidden">
+        <div class="screen-header">
+          <h1>Preview &amp; Edit</h1>
+          <p class="subtitle">Review and edit values before generating the Excel report</p>
+        </div>
+
+        <div class="card preview-section">
+          <h3>Basic Information</h3>
+          <div class="preview-grid" id="basic-info-grid"></div>
+        </div>
+
+        <div class="card preview-section">
+          <h3>Chemical Composition</h3>
+          <div class="table-wrap">
+            <table class="preview-table" id="table-chemical">
+              <thead>
+                <tr>
+                  <th>Element</th>
+                  <th>Specified</th>
+                  <th>Actual</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card preview-section">
+          <h3>Mechanical Properties</h3>
+          <div class="table-wrap">
+            <table class="preview-table" id="table-mechanical">
+              <thead>
+                <tr>
+                  <th>Property</th>
+                  <th>Specified</th>
+                  <th>Actual</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn btn-ghost" id="btn-back-preview">Back</button>
+          <button type="button" class="btn btn-success" id="btn-final-download">Download Final Report</button>
+        </div>
+        <p class="status-msg" id="preview-status"></p>
+      </section>
+    </div>
+
+    <script>
+      window.MTR_API_ROOT = window.location.origin;
+    </script>
+    <script src="/script.js" defer></script>
+  </body>
+</html>
