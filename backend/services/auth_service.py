@@ -3,9 +3,16 @@ from typing import Dict, List, Optional
 
 import bcrypt
 import jwt
-from dotenv import load_dotenv
 
-from config import AUTH_FILE, FIXED_USERS, JWT_ALGORITHM, JWT_EXPIRE_HOURS, ensure_jwt_secret, load_password_hashes
+from config import (
+    AUTH_FILE,
+    FIXED_USERS,
+    JWT_ALGORITHM,
+    JWT_EXPIRE_HOURS,
+    auth_is_configured,
+    ensure_jwt_secret,
+    load_password_hashes,
+)
 
 
 class AuthService:
@@ -15,8 +22,7 @@ class AuthService:
         AUTH_FILE.write_text(json.dumps({"users": hashes, "configured": True}, indent=2), encoding="utf-8")
 
     def is_configured(self) -> bool:
-        hashes = load_password_hashes()
-        return AUTH_FILE.is_file() and all(hashes.get(username) for username in FIXED_USERS)
+        return auth_is_configured()
 
     def list_usernames(self) -> List[str]:
         return list(FIXED_USERS)
@@ -50,7 +56,6 @@ class AuthService:
             raise ValueError(f"Missing passwords for: {', '.join(missing)}")
 
         self._write_auth_file(updates)
-        load_dotenv(AUTH_FILE, override=True)
 
     def create_token(self, username: str) -> str:
         secret = ensure_jwt_secret()

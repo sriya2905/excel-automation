@@ -1,9 +1,30 @@
+# Render Blueprint — backend API only
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy from repo root (Root Directory = blank).
+# Entry: app.py  |  Start: uvicorn app:app --host 0.0.0.0 --port $PORT
 services:
   - type: web
-    name: material-test-report-generator
-    env: python
-    buildCommand: pip install -r requirements.txt
+    name: material-test-report-api
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
     startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: "3.11.9"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: JWT_EXPIRE_HOURS
+        value: "12"
+      # Set these manually in the Render dashboard after running:
+      #   cd backend && python scripts/print_render_env.py
+      - key: PASSWORD_HASH_MAHESH_CHAVAN
+        sync: false
+      - key: PASSWORD_HASH_RAHUL_KARAPE
+        sync: false
+      - key: PASSWORD_HASH_DIGEMBER
+        sync: false
+      - key: PASSWORD_HASH_QA_LAB
+        sync: false

@@ -65,7 +65,12 @@ app.include_router(report_router, prefix="/api", tags=["Reports"])
 @app.on_event("startup")
 def on_startup():
     if check_auth_configured():
-        print("\n[AUTH] Authentication configured. 4 users ready.\n")
+        print("\n[AUTH] Authentication configured.\n")
+    elif os.getenv("RENDER"):
+        print(
+            "\n[AUTH] Passwords not configured. Set PASSWORD_HASH_* env vars in Render "
+            "or use POST /api/auth/setup once after deploy.\n"
+        )
     else:
         print("\n[AUTH] Passwords not configured - run backend/setup.bat first.\n")
 
