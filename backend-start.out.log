@@ -1,0 +1,13 @@
+
+[AUTH] Passwords not configured — run setup.bat or open http://127.0.0.1:8000 for in-browser setup.
+
+INFO:     127.0.0.1:62217 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61024 - "GET /style.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57126 - "POST /login HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:56678 - "OPTIONS /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56678 - "POST /login HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:62330 - "OPTIONS /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62330 - "POST /login HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:56769 - "POST /login HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:63314 - "POST /login HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:54084 - "POST /login HTTP/1.1" 503 Service Unavailable

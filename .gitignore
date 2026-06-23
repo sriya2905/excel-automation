@@ -1,0 +1,27 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments (never commit these)
+.venv/
+venv/
+backend/venv/
+
+# Environment secrets (never commit passwords/keys)
+backend/.env
+backend/.env.auth
+
+# Uploaded and generated files (too large for git)
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/outputs/*
+!backend/outputs/.gitkeep
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
