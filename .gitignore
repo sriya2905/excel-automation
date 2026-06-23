@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.test-pyc.*
+backend/%SystemDrive%/
 
 # Virtual environments (never commit these)
 .venv/
