@@ -1,6 +1,6 @@
 /**
- * Material Test Report Generator — SGIL
- * Flow: Setup (once) → Login → Upload → Entry → Preview → Download
+ * Material Test Report Generator â€” SGIL
+ * Flow: Setup (once) â†’ Login â†’ Upload â†’ Entry â†’ Preview â†’ Download
  */
 /** Backend root: same host in cloud, local backend when opened as a file. */
 function resolveApiRoot() {
@@ -16,6 +16,9 @@ function resolveApiRoot() {
 const API_ROOT = resolveApiRoot();
 const API_BASE = `${API_ROOT}/api`;
 const REQ_MS = 300000;
+const SETUP_FLAG_KEY = 'mtr_setup_complete';
+const PERSIST_TOKEN_KEY = 'mtr_token_persist';
+const PERSIST_USERNAME_KEY = 'mtr_username_persist';
 
 const AUTH_USERS = [
   'Mahesh Chavan',
@@ -54,8 +57,8 @@ const BASIC_FIELDS = [
 ];
 
 const state = {
-  token: sessionStorage.getItem('mtr_token') || '',
-  username: sessionStorage.getItem('mtr_username') || '',
+  token: localStorage.getItem(PERSIST_TOKEN_KEY) || sessionStorage.getItem('mtr_token') || '',
+  username: localStorage.getItem(PERSIST_USERNAME_KEY) || sessionStorage.getItem('mtr_username') || '',
   templateFilename: '',
   metallurgyFilename: '',
   specFilename: '',
@@ -130,17 +133,28 @@ async function checkAuthStatus() {
   return res.json();
 }
 
-function saveSession(token, username) {
+function saveSession(token, username, remember = true) {
   state.token = token;
   state.username = username;
-  sessionStorage.setItem('mtr_token', token);
-  sessionStorage.setItem('mtr_username', username);
+  if (remember) {
+    localStorage.setItem(PERSIST_TOKEN_KEY, token);
+    localStorage.setItem(PERSIST_USERNAME_KEY, username);
+    sessionStorage.removeItem('mtr_token');
+    sessionStorage.removeItem('mtr_username');
+  } else {
+    sessionStorage.setItem('mtr_token', token);
+    sessionStorage.setItem('mtr_username', username);
+    localStorage.removeItem(PERSIST_TOKEN_KEY);
+    localStorage.removeItem(PERSIST_USERNAME_KEY);
+  }
   $('header-username').textContent = username;
 }
 
 function clearSession() {
   state.token = '';
   state.username = '';
+  localStorage.removeItem(PERSIST_TOKEN_KEY);
+  localStorage.removeItem(PERSIST_USERNAME_KEY);
   sessionStorage.removeItem('mtr_token');
   sessionStorage.removeItem('mtr_username');
 }
@@ -241,10 +255,15 @@ async function initApp() {
       populateUserSelect(status.users);
     }
     if (status.configured === false) {
+      if (localStorage.getItem(SETUP_FLAG_KEY) === '1') {
+        showScreen('login');
+        return;
+      }
       renderSetupForm(status.users || AUTH_USERS);
       showScreen('setup');
       return;
     }
+    localStorage.setItem(SETUP_FLAG_KEY, '1');
   } catch {
     /* keep hardcoded AUTH_USERS */
   }
@@ -643,3 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initApp();
 });
+
+
+
+

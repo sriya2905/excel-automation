@@ -10,6 +10,8 @@ function apiRootCandidates() {
 
 const TOKEN_KEY = 'mtr_token';
 const USER_KEY = 'mtr_username';
+const PERSIST_TOKEN_KEY = 'mtr_token_persist';
+const PERSIST_USER_KEY = 'mtr_username_persist';
 
 const AUTH_USERS = [
   'Mahesh Chavan',
@@ -17,6 +19,19 @@ const AUTH_USERS = [
   'Digember',
   'Q/A Lab',
 ];
+
+function readSavedSession() {
+  if (typeof window === 'undefined') return { token: '', username: '' };
+  const token =
+    localStorage.getItem(PERSIST_TOKEN_KEY) ||
+    sessionStorage.getItem(TOKEN_KEY) ||
+    '';
+  const username =
+    localStorage.getItem(PERSIST_USER_KEY) ||
+    sessionStorage.getItem(USER_KEY) ||
+    '';
+  return { token, username };
+}
 
 function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState(AUTH_USERS[0]);
@@ -138,7 +153,7 @@ function LoginScreen({ onLogin }) {
           ) : null}
 
           <button type="submit" disabled={busy} style={loginBtnStyle}>
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? 'Signing inâ€¦' : 'Sign in'}
           </button>
         </form>
       </div>
@@ -147,17 +162,28 @@ function LoginScreen({ onLogin }) {
 }
 
 function App() {
-  const [token, setToken] = useState(() => sessionStorage.getItem(TOKEN_KEY) || '');
-  const [username, setUsername] = useState(() => sessionStorage.getItem(USER_KEY) || '');
+  const [token, setToken] = useState(() => readSavedSession().token);
+  const [username, setUsername] = useState(() => readSavedSession().username);
 
-  const handleLogin = (newToken, name) => {
-    sessionStorage.setItem(TOKEN_KEY, newToken);
-    sessionStorage.setItem(USER_KEY, name);
+  const handleLogin = (newToken, name, remember = true) => {
+    if (remember) {
+      localStorage.setItem(PERSIST_TOKEN_KEY, newToken);
+      localStorage.setItem(PERSIST_USER_KEY, name);
+      sessionStorage.removeItem(TOKEN_KEY);
+      sessionStorage.removeItem(USER_KEY);
+    } else {
+      sessionStorage.setItem(TOKEN_KEY, newToken);
+      sessionStorage.setItem(USER_KEY, name);
+      localStorage.removeItem(PERSIST_TOKEN_KEY);
+      localStorage.removeItem(PERSIST_USER_KEY);
+    }
     setToken(newToken);
     setUsername(name);
   };
 
   const handleLogout = useCallback(() => {
+    localStorage.removeItem(PERSIST_TOKEN_KEY);
+    localStorage.removeItem(PERSIST_USER_KEY);
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     setToken('');
@@ -168,7 +194,8 @@ function App() {
     const id = axios.interceptors.response.use(
       (res) => res,
       (err) => {
-        if (err.response?.status === 401 && sessionStorage.getItem(TOKEN_KEY)) {
+        const savedToken = localStorage.getItem(PERSIST_TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+        if (err.response?.status === 401 && savedToken) {
           handleLogout();
         }
         return Promise.reject(err);
@@ -238,3 +265,4 @@ const loginBtnStyle = {
   fontSize: '1rem',
   cursor: 'pointer',
 };
+

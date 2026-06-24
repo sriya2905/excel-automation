@@ -18,7 +18,7 @@ const API_BASE = `${apiRoot().replace(/\/$/, '')}/api`;
 const REQ_MS = 300000;
 
 function authHeaders() {
-  const token = sessionStorage.getItem('mtr_token');
+  const token = localStorage.getItem('mtr_token_persist') || sessionStorage.getItem('mtr_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -47,7 +47,7 @@ function UploadCard({
   return (
     <div style={{ ...uploadCardStyle, borderTopColor: accent }}>
       <div style={{ ...uploadAccentStyle, background: accent }}>
-        <span style={{ fontSize: 18, color: '#fff' }}>⇪</span>
+        <span style={{ fontSize: 18, color: '#fff' }}>â‡ª</span>
       </div>
       <div style={uploadCardTitleStyle}>{title}</div>
       <div style={uploadCardTextStyle}>{description}</div>
@@ -1432,3 +1432,4 @@ const busyTextStyle = {
   color: '#475569',
   fontWeight: 700,
 };
+
