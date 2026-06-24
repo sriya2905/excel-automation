@@ -194,23 +194,44 @@ class ExcelService:
         want_h = _norm_heat(heat_no)
         want_i = _norm_item(item_name)
 
+        def _row_text(row: pd.Series) -> str:
+            parts = []
+            for col in df.columns:
+                val = _cell_to_display_str(row[col])
+                if val:
+                    parts.append(val)
+            return _norm_item(" ".join(parts))
+
+        def _item_matches(item_cell: str) -> bool:
+            if not want_i:
+                return True
+            if not item_cell:
+                return False
+            if want_i in item_cell or item_cell in want_i:
+                return True
+            tokens = [t for t in want_i.split() if len(t) > 2]
+            return any(t in item_cell for t in tokens)
+
         for _, row in df.iterrows():
             cell_h = _norm_heat(self._row_value(row, df, hidx))
             if not cell_h:
                 continue
             if want_h not in cell_h and cell_h not in want_h and cell_h != want_h:
                 continue
-            if want_i:
-                item_cell = _norm_item(self._row_value(row, df, iidx)) if iidx is not None else ""
-                if not item_cell:
-                    continue
-                if want_i not in item_cell and item_cell not in want_i:
-                    tokens = [t for t in want_i.split() if len(t) > 2]
-                    if not any(t in item_cell for t in tokens):
-                        continue
+            item_cell = _norm_item(self._row_value(row, df, iidx)) if iidx is not None else ""
+            if not _item_matches(item_cell):
+                continue
             return row, ""
-        return None, f"No row matched Heat '{heat_no}' and Casting '{item_name}'."
 
+        for _, row in df.iterrows():
+            row_text = _row_text(row)
+            if want_h and want_h not in row_text:
+                continue
+            if not _item_matches(row_text):
+                continue
+            return row, ""
+
+        return None, f"No row matched Heat '{heat_no}' and Casting '{item_name}'."
     def search_mechanical_specified(
         self,
         casting_name: str,
@@ -640,21 +661,15 @@ class ExcelService:
         for j, el in enumerate(CHEMICAL_ORDER):
             col = 3 + j
             addr17 = ws.cell(row=17, column=col).coordinate
-            addr18 = ws.cell(row=18, column=col).coordinate
             addr19 = ws.cell(row=19, column=col).coordinate
             row = chem_by_el.get(el)
             spec_txt = _cell_to_display_str(row.get("specified")) if row else ""
             act_txt = _cell_to_display_str(row.get("actual")) if row else ""
             if spec_txt:
-                parts = re.split(r"\s*[-–]\s*|\s+to\s+", spec_txt, maxsplit=1, flags=re.I)
-                if len(parts) == 2:
-                    low, high = parts[0].strip(), parts[1].strip()
-                else:
-                    low, high = spec_txt, ""
-                self._set_cell_value_only(ws, addr17, low)
-                self._set_cell_value_only(ws, addr18, high)
+                # The template uses one merged cell per element in row 17-18, so
+                # write the full spec string once instead of splitting it across rows.
+                self._set_cell_value_only(ws, addr17, spec_txt)
             self._set_cell_value_only(ws, addr19, act_txt)
-
         for mk, (spec_cell, act_cell) in MECH_CELL_MAP.items():
             pair = mech_vals.get(mk)
             if not pair:
@@ -673,3 +688,4 @@ class ExcelService:
         os.makedirs("outputs", exist_ok=True)
         wb.save(out_path)
         return {"output_filename": out_name, "output_path": out_path}
+

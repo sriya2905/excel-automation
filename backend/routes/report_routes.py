@@ -192,107 +192,31 @@ def get_val_by_aliases(row, columns, aliases, exclusions=None, allow_substring=T
     return ""
 
 
-def search_metallurgy_data(heat_no, casting_name):
+def search_metallurgy_data(heat_no, casting_name, metallurgy_path):
     try:
-        met_file = None
-        for f in os.listdir('uploads'):
-            if 'metallurgy' in f.lower() or 'furnace' in f.lower() or 'metallurgical' in f.lower():
-                met_file = os.path.join('uploads', f)
-                break
-        if not met_file:
+        if not metallurgy_path or not os.path.isfile(metallurgy_path):
             return None
-        
-        df = pd.read_excel(met_file, header=4)
-        
-        heat_col = 'Heat No  '
-        casting_col = ' Casting Name'
-        
-        df[heat_col] = df[heat_col].astype(str).str.strip()
-        df[casting_col] = df[casting_col].astype(str).str.strip()
-        
-        match = df[
-            df[heat_col].str.contains(heat_no.strip(), case=False, na=False) &
-            df[casting_col].str.contains(casting_name.strip(), case=False, na=False)
-        ]
-        
-        if match.empty:
-            match = df[df[heat_col].str.contains(heat_no.strip(), case=False, na=False)]
-        
-        if match.empty:
-            return None
-        
-        row = match.iloc[0]
-        
-        def safe(val):
-            try:
-                if pd.isna(val): return None
-                return val
-            except: return None
-        
-        # Safely find individual impact column indices
-        col_idx = -1
-        for i, col in enumerate(df.columns):
-            if 'Impact Value Individual' in str(col):
-                col_idx = i
-                break
-        
-        imp1, imp2, imp3 = None, None, None
-        if col_idx != -1:
-            try: imp1 = safe(row.iloc[col_idx])
-            except: pass
-            try: imp2 = safe(row.iloc[col_idx + 1])
-            except: pass
-        impact_ind_1 = safe(row['Impact Value Individual      (Joule)'])
-        impact_ind_2 = safe(row['Unnamed: 40'])
-        impact_ind_3 = safe(row['Unnamed: 41'])
 
-        def find_col_val(aliases):
-            for c in df.columns:
-                cl = str(c).lower().strip()
-                if cl in aliases:
-                    return safe(row[c])
+        row_data = excel_service.search_heat_no(metallurgy_path, heat_no, casting_name)
+        if not row_data or not row_data.get('found'):
             return None
-            
-        drawing_no_val = find_col_val(['drawing no', 'drawing number', 'drg no', 'drawing no.', 'drg no.'])
-        invoice_val = find_col_val(['invoice', 'invoice no', 'invoice no.', 'invoice number'])
-        qty_val = find_col_val(['qty', 'quantity', 'qty.'])
-        
+
         return {
-            'customer': safe(row['Customer Name']),
-            'material_grade': safe(row['Grade']),
-            'casting_name': safe(row[casting_col]),
-            'casting_sl_no': safe(row['Casting SL No.']),
-            'drawing_no': drawing_no_val,
-            'invoice': invoice_val,
-            'qty': qty_val,
-            'chemical_actual': {
-                'C': safe(row['TC']),
-                'Si': safe(row['Si']),
-                'Mn': safe(row['Mn']),
-                'P': safe(row['P']),
-                'S': safe(row['S']),
-                'Cu': safe(row['Cu']),
-                'Ni': safe(row['Ni']),
-                'Mg': safe(row['Mg'])
-            },
-            'mechanical_actual': {
-                'tensile': safe(row['Tensile Strength  (N/mm2)']),
-                'proof_stress': safe(row['0.2% proof  Stress  (N/mm2)']),
-                'elongation': safe(row['% Elongation']),
-                'hardness': None,
-                'impact_individual_1': impact_ind_1,
-                'impact_individual_2': impact_ind_2,
-                'impact_individual_3': impact_ind_3,
-                'impact_mean': safe(row['Impact Value Mean (Joule)'])
-            }
+            'customer': row_data.get('customer', ''),
+            'material_grade': row_data.get('material_grade', ''),
+            'casting_name': row_data.get('casting_name', ''),
+            'casting_sl_no': row_data.get('casting_sl_no', ''),
+            'drawing_no': row_data.get('drawing_no', ''),
+            'invoice': row_data.get('invoice_no_date', ''),
+            'qty': row_data.get('qty', ''),
+            'chemical_actual': row_data.get('chemical_actual') or {},
+            'mechanical_actual': row_data.get('mechanical_actual') or {},
         }
     except Exception as e:
         print(f"Search error: {e}")
         import traceback
         traceback.print_exc()
         return None
-
-
 async def _run_search_preview(body: HeatSearchRequest) -> dict:
     import pandas as pd
 
@@ -312,7 +236,7 @@ async def _run_search_preview(body: HeatSearchRequest) -> dict:
     want_heat = str(body.heat_no).strip()
     want_casting = str(body.casting_name).strip()
 
-    res_met = search_metallurgy_data(want_heat, want_casting)
+    res_met = search_metallurgy_data(want_heat, want_casting, metallurgy_path)
     if not res_met:
         raise HTTPException(status_code=404, detail=f"No matching row found for Heat '{want_heat}' and Casting '{want_casting}' in metallurgy sheet.")
 
@@ -664,3 +588,4 @@ async def download_report(body: dict):
         print("ERROR IN DOWNLOAD ENDPOINT:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
