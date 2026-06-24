@@ -2,8 +2,18 @@
  * Material Test Report Generator — SGIL
  * Flow: Setup (once) → Login → Upload → Entry → Preview → Download
  */
-/** Backend root — always point to the FastAPI server on port 8000 */
-const API_ROOT = 'http://127.0.0.1:8000';
+/** Backend root: same host in cloud, local backend when opened as a file. */
+function resolveApiRoot() {
+  const configured = typeof window !== 'undefined' && window.MTR_API_ROOT
+    ? String(window.MTR_API_ROOT).trim()
+    : '';
+  const origin = typeof window !== 'undefined' && window.location?.protocol !== 'file:'
+    ? window.location.origin
+    : '';
+  return (configured || origin || 'http://127.0.0.1:8000').replace(/\/$/, '');
+}
+
+const API_ROOT = resolveApiRoot();
 const API_BASE = `${API_ROOT}/api`;
 const REQ_MS = 300000;
 
@@ -241,7 +251,7 @@ async function handleLogin() {
     setStatus(st, '');
   } catch (e) {
     const msg = e.message === 'Failed to fetch'
-      ? 'Cannot reach backend. Make sure start.bat is running (port 8000).'
+      ? 'Cannot reach backend. Refresh the page and make sure the cloud service is running.'
       : e.message || 'Login failed.';
     setStatus(st, msg, true);
   }
