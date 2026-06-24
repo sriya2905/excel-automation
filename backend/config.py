@@ -53,7 +53,18 @@ JWT_SECRET = os.getenv("JWT_SECRET_KEY") or os.getenv("JWT_SECRET") or ""
 
 JWT_ALGORITHM = "HS256"
 
-JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "12"))
+
+def get_env_int(name: str, default: int) -> int:
+    value = (os.getenv(name) or "").strip()
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {value!r}") from exc
+
+
+JWT_EXPIRE_HOURS = get_env_int("JWT_EXPIRE_HOURS", 12)
 
 
 
