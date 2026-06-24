@@ -1,5 +1,6 @@
 .env
 .env.auth
+!.env.auth
 venv/
 __pycache__/
 *.pyc
@@ -7,3 +8,4 @@ uploads/*
 !uploads/.gitkeep
 outputs/*
 !outputs/.gitkeep
+
