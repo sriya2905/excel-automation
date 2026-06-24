@@ -145,16 +145,30 @@ function clearSession() {
   sessionStorage.removeItem('mtr_username');
 }
 
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"]/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+  }[ch]));
+}
+
 function renderSetupForm(users) {
   const form = $('setup-form');
   form.innerHTML = users
-    .map(
-      (u) => `
+    .map((u) => {
+      const safeUser = escapeHtml(u);
+      const id = `setup-pw-${String(u || '').replace(/\W/g, '_')}`;
+      return `
     <div class="form-group">
-      <label for="setup-pw-${String(u || '').replace(/\W/g, '_')}">${u}</label>
-      <input type="password" id="setup-pw-${String(u || '').replace(/\W/g, '_')}" data-user="${u}" autocomplete="new-password" />
-    </div>`,
-    )
+      <label for="${id}">${safeUser}</label>
+      <div class="password-field">
+        <input type="password" id="${id}" data-user="${safeUser}" autocomplete="new-password" />
+        <button type="button" class="password-toggle" data-target="${id}" aria-label="Show password for ${safeUser}">Show</button>
+      </div>
+    </div>`;
+    })
     .join('');
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -162,31 +176,63 @@ function renderSetupForm(users) {
   btn.id = 'btn-save-setup';
   btn.textContent = 'Save Passwords';
   form.appendChild(btn);
+  form.querySelectorAll('.password-toggle').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const input = $(toggle.dataset.target);
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      toggle.textContent = show ? 'Hide' : 'Show';
+      toggle.setAttribute('aria-label', `${show ? 'Hide' : 'Show'} password for ${input.dataset.user}`);
+    });
+  });
   btn.addEventListener('click', submitSetup);
 }
 
 async function submitSetup() {
   const st = $('setup-status');
-  setStatus(st, '');
+  const btn = $('btn-save-setup');
+  if (btn?.disabled) return;
+  setStatus(st, 'Saving passwords...', false);
   const passwords = {};
+  const missing = [];
   $('setup-form').querySelectorAll('input[data-user]').forEach((inp) => {
-    passwords[inp.dataset.user] = inp.value;
+    const value = inp.value.trim();
+    passwords[inp.dataset.user] = value;
+    if (value.length < 4) missing.push(inp.dataset.user);
   });
+  if (missing.length) {
+    setStatus(st, `Password must be at least 4 characters for: ${missing.join(', ')}`, true);
+    return;
+  }
   try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+    }
     const res = await fetch(`${API_BASE}/auth/setup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ passwords }),
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { detail: text }; }
     if (!res.ok) throw new Error(data.detail || data.message || 'Setup failed');
-    setStatus(st, 'Setup complete. Passwords saved to backend/.env — please log in.', false);
+    setStatus(st, 'Setup complete. Passwords saved. Opening login...', false);
+    clearSession();
     setTimeout(() => initApp(), 800);
   } catch (e) {
-    setStatus(st, e.message, true);
+    const msg = e.message === 'Failed to fetch'
+      ? 'Cannot reach backend. Refresh the page and make sure the cloud service is running.'
+      : e.message || 'Setup failed.';
+    setStatus(st, msg, true);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Save Passwords';
+    }
   }
 }
-
 async function initApp() {
   populateUserSelect(AUTH_USERS);
   try {
