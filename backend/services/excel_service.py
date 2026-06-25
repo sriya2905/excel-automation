@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import PatternFill
 from openpyxl.drawing.image import Image as XLImage
 
 from utils.column_detector import ColumnDetector
@@ -100,15 +99,6 @@ def _replace_cover_logo(sheet, logo_path: str) -> None:
         sheet.add_image(logo, "B2")
     except Exception as exc:
         print(f"Unable to replace cover logo: {exc}")
-
-def _clear_cover_right_block(sheet) -> None:
-    white_fill = PatternFill(fill_type="solid", fgColor="FFFFFF")
-    for row in range(2, 5):
-        for col in range(4, 13):  # D:L
-            sheet.cell(row=row, column=col).fill = white_fill
-        for col in range(11, 13):  # K:L stays blank in the top-right corner
-            sheet.cell(row=row, column=col).value = None
-
 
 
 class ExcelService:
@@ -658,7 +648,6 @@ class ExcelService:
         wb = load_workbook(template_path, keep_links=True)
         ws = wb.active
         _replace_cover_logo(ws, os.path.join(str(BASE_DIR), "company_logo.png"))
-        _clear_cover_right_block(ws)
 
         basic_fallback = row_fallback if isinstance(row_fallback, dict) else {}
 
@@ -669,6 +658,9 @@ class ExcelService:
         self._set_cell_value_only(ws, BASIC_CELLS["heat_no"], heat_no or basic_fallback.get("heat_no", ""))
         self._set_cell_value_only(ws, BASIC_CELLS["casting_sl_no"], casting_sl_no or basic_fallback.get("casting_sl_no", ""))
         self._set_cell_value_only(ws, BASIC_CELLS["invoice_no_date"], invoice_no_date or basic_fallback.get("invoice_no_date", ""))
+        self._set_cell_value_only(ws, BASIC_CELLS["doc_ref"], doc_ref or basic_fallback.get("doc_ref", ""))
+        self._set_cell_value_only(ws, BASIC_CELLS["issue_no_dt"], issue_no_dt or basic_fallback.get("issue_no_dt", ""))
+        self._set_cell_value_only(ws, BASIC_CELLS["rev_no_dt"], rev_no_dt or basic_fallback.get("rev_no_dt", ""))
 
         chem_by_el: Dict[str, Dict[str, Any]] = {}
         for r in chemical_rows:
