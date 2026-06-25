@@ -7,6 +7,7 @@ from typing import Tuple
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 from openpyxl.drawing.image import Image as XLImage
 
 from dependencies.auth import get_current_user
@@ -107,6 +108,15 @@ def _replace_cover_logo(sheet, logo_path: str) -> None:
         sheet.add_image(logo, "B2")
     except Exception as exc:
         print(f"Unable to replace cover logo: {exc}")
+
+def _clear_cover_right_block(sheet) -> None:
+    white_fill = PatternFill(fill_type="solid", fgColor="FFFFFF")
+    for row in range(2, 5):
+        for col in range(4, 13):  # D:L
+            sheet.cell(row=row, column=col).fill = white_fill
+        for col in range(11, 13):  # K:L stays blank in the top-right corner
+            sheet.cell(row=row, column=col).value = None
+
 
 
 @router.post("/upload_mechanical_requirements")
@@ -500,6 +510,7 @@ async def download_report(body: dict):
         wb2 = _lw(template_path)
         sheet = wb2.active
         _replace_cover_logo(sheet, os.path.join(BASE_DIR, "company_logo.png"))
+        _clear_cover_right_block(sheet)
 
         def safe_write(sheet, cell, value):
             if value is None:
