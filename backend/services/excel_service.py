@@ -1,15 +1,19 @@
 import os
 import re
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from openpyxl import Workbook, load_workbook
+from openpyxl.drawing.image import Image as XLImage
 
 from utils.column_detector import ColumnDetector
 from utils.mechanical_requirements import search_mechanical_specified
 from utils.template_fields import CHEMICAL_ELEMENTS, MECHANICAL_FIELDS
 from config import resolve_mechanical_requirements_path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def _cell_to_display_str(value: Any) -> str:
@@ -81,6 +85,20 @@ def _norm_heat(s: str) -> str:
 
 def _norm_item(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+def _replace_cover_logo(sheet, logo_path: str) -> None:
+    if not os.path.isfile(logo_path):
+        return
+    try:
+        if getattr(sheet, "_images", None):
+            # Replace the top-left cover/logo picture with the local company logo.
+            sheet._images.pop(0)
+        logo = XLImage(logo_path)
+        logo.width = 270
+        logo.height = 237
+        sheet.add_image(logo, "B2")
+    except Exception as exc:
+        print(f"Unable to replace cover logo: {exc}")
 
 
 class ExcelService:
@@ -629,6 +647,7 @@ class ExcelService:
 
         wb = load_workbook(template_path, keep_links=True)
         ws = wb.active
+        _replace_cover_logo(ws, os.path.join(str(BASE_DIR), "company_logo.png"))
 
         basic_fallback = row_fallback if isinstance(row_fallback, dict) else {}
 

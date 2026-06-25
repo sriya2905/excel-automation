@@ -7,6 +7,7 @@ from typing import Tuple
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
+from openpyxl.drawing.image import Image as XLImage
 
 from dependencies.auth import get_current_user
 from models.schemas import DetectColumnsRequest, GenerateReportRequest, HeatSearchRequest, PreviewMappedRequest
@@ -91,6 +92,21 @@ def _casting_name(body: HeatSearchRequest) -> str:
 
 def _mech_req_filename(body) -> str:
     return (getattr(body, "mechanical_requirements_filename", None) or "").strip()
+
+
+def _replace_cover_logo(sheet, logo_path: str) -> None:
+    if not os.path.isfile(logo_path):
+        return
+    try:
+        if getattr(sheet, "_images", None):
+            # Replace the top-left cover/logo picture with the local company logo.
+            sheet._images.pop(0)
+        logo = XLImage(logo_path)
+        logo.width = 270
+        logo.height = 237
+        sheet.add_image(logo, "B2")
+    except Exception as exc:
+        print(f"Unable to replace cover logo: {exc}")
 
 
 @router.post("/upload_mechanical_requirements")
@@ -483,6 +499,7 @@ async def download_report(body: dict):
         from openpyxl import load_workbook as _lw
         wb2 = _lw(template_path)
         sheet = wb2.active
+        _replace_cover_logo(sheet, os.path.join(BASE_DIR, "company_logo.png"))
 
         def safe_write(sheet, cell, value):
             if value is None:
