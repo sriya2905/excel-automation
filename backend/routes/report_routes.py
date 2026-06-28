@@ -320,7 +320,7 @@ async def _run_search_preview(body: HeatSearchRequest) -> dict:
     chemical_spec_data = get_chemical_specified(material_grade)
 
     casting_name = want_casting
-    spec_data = search_mechanical_specified(casting_name)
+    spec_data = search_mechanical_specified(customer or casting_name, casting_name)
     print("Specified data found:", spec_data)
 
     return {
@@ -486,37 +486,24 @@ async def download_report(body: dict):
         impact_ind_actual = mech_act.get("impact_individual", "")
         impact_mean_actual = mech_act.get("impact_mean", "")
 
-        # Step 1: scan uploads for template file (any file with 'template' in name)
-        template_path_found = None
-        for f in os.listdir(UPLOADS_DIR):
-            if 'template' in f.lower():
-                template_path_found = os.path.join(UPLOADS_DIR, f)
-                break
-        if template_path_found:
-            template_path = template_path_found
-
-        # Step 2: load template
+        # Load the requested template exactly as uploaded; do not swap in a
+        # different template from the uploads folder, because that can change
+        # the sheet geometry and break the expected report layout.
         from openpyxl import load_workbook as _lw
         wb2 = _lw(template_path)
         sheet = wb2.active
-        _replace_cover_logo(sheet, os.path.join(BASE_DIR, "company_logo.png"))
-
         def safe_write(sheet, cell, value):
             if value is None:
                 return
             val_str = str(value).strip().lower()
             if val_str == "" or val_str == "none" or val_str == "nan":
                 return
-            
-            try:
-                sheet[cell] = value
-            except:
-                for mr in list(sheet.merged_cells.ranges):
-                    if cell in mr:
-                        sheet.unmerge_cells(str(mr))
-                        sheet[cell] = value
-                        sheet.merge_cells(str(mr))
-                        break
+
+            for mr in list(sheet.merged_cells.ranges):
+                if cell in mr:
+                    sheet.cell(row=mr.min_row, column=mr.min_col).value = value
+                    return
+            sheet[cell] = value
 
         # Step 4: write all cells
         safe_write(sheet, 'D6', customer)
@@ -526,10 +513,10 @@ async def download_report(body: dict):
         safe_write(sheet, 'D10', heat_no)
         safe_write(sheet, 'K10', casting_sl_no)
         
-        invoice_val = _get_bi_val(bi, body, "invoice")
-        qty_val = _get_bi_val(bi, body, "qty")
-        inv_qty_str = f"{invoice_val} / {qty_val}" if invoice_val and qty_val else f"{invoice_val or ''}{qty_val or ''}"
-        safe_write(sheet, 'K12', inv_qty_str)
+        # The template metadata and the frontend both map invoice/date to K12.
+        # Keep the value there so the generated workbook matches the rest of the app.
+        invoice_val = _get_bi_val(bi, body, "invoice_no_date") or _get_bi_val(bi, body, "invoice")
+        safe_write(sheet, 'K12', invoice_no_date or invoice_val)
         safe_write(sheet, 'L2', doc_ref)
         safe_write(sheet, 'L3', issue_no_dt)
         safe_write(sheet, 'L4', rev_no_dt)
@@ -608,4 +595,5 @@ async def download_report(body: dict):
         print("ERROR IN DOWNLOAD ENDPOINT:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
 

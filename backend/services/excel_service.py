@@ -9,6 +9,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.drawing.image import Image as XLImage
 
 from utils.column_detector import ColumnDetector
+from utils.tabular_source import load_tabular_frames
 from utils.mechanical_requirements import search_mechanical_specified
 from utils.template_fields import CHEMICAL_ELEMENTS, MECHANICAL_FIELDS
 from config import resolve_mechanical_requirements_path
@@ -33,6 +34,7 @@ CHEMICAL_SPECS = {
     'EN-GJS-400-18U-LT': {'C':'3.60 - 3.80','Si':'2.00 - 2.25','Mn':'0.45 Max.','P':'0.050 Max.','S':'0.012 Max.','Cu':'0.200 Max.','Ni':'1.00 Max.','Mg':'0.020 - 0.060'},
     '500/7': {'C':'3.50 - 3.80','Si':'1.80 - 2.40','Mn':'0.50 Max.','P':'0.050 Max.','S':'0.012 Max.','Cu':'0.200 Max.','Ni':'1.00 Max.','Mg':'0.020 - 0.060'},
     '600/3': {'C':'3.50 - 3.80','Si':'2.20 - 2.80','Mn':'0.50 Max.','P':'0.050 Max.','S':'0.012 Max.','Cu':'0.200 Max.','Ni':'1.00 Max.','Mg':'0.020 - 0.060'},
+    '450/10': {'C':'3.50 - 3.80','Si':'2.00 - 2.80','Mn':'0.50 Max.','P':'0.050 Max.','S':'0.012 Max.','Cu':'0.200 Max.','Ni':'1.00 Max.','Mg':'0.020 - 0.060'},
 }
 
 def get_chemical_specified(grade):
@@ -58,12 +60,12 @@ MECH_CELL_MAP = {
 # Template cell map (only .value is written — images/formatting preserved)
 BASIC_CELLS = {
     "customer": "D6",
-    "material_grade": "J6",
+    "material_grade": "K6",
     "casting_name": "D8",
-    "drawing_no": "J8",
+    "drawing_no": "K8",
     "heat_no": "D10",
     "casting_sl_no": "K10",
-    "invoice_no_date": "D12",
+    "invoice_no_date": "K12",
     "doc_ref": "L2",
     "issue_no_dt": "L3",
     "rev_no_dt": "L4",
@@ -103,22 +105,24 @@ def _replace_cover_logo(sheet, logo_path: str) -> None:
 
 class ExcelService:
     def list_excel_columns(self, filepath: str) -> Dict[str, Any]:
-        """Return header row index and column names from the metallurgy sheet."""
-        det = ColumnDetector()
-        _, hr = det.detect(filepath)
-        df = pd.read_excel(filepath, sheet_name=0, header=hr, dtype=object)
-        columns = [str(c).strip() for c in df.columns]
-        return {"header_row": hr, "columns": columns}
+        """Return header row index and column names from the metallurgy source."""
+        frames = load_tabular_frames(filepath)
+        if not frames:
+            return {"header_row": 0, "columns": []}
+        columns = [str(c).strip() for c in frames[0].columns]
+        return {"header_row": 0, "columns": columns}
 
     def suggested_mapping_from_detect(self, filepath: str) -> Dict[str, str]:
-        """Auto-detected field_id -> Excel column name mapping."""
-        det = ColumnDetector()
-        cmap, hr = det.detect(filepath)
-        df = pd.read_excel(filepath, sheet_name=0, header=hr, dtype=object)
+        """Auto-detected field_id -> source column mapping."""
+        frames = load_tabular_frames(filepath)
+        if not frames:
+            return {}
+        df = frames[0]
         columns = [str(c).strip() for c in df.columns]
+        cmap = self._cmap_from_columns(columns)
         mapping: Dict[str, str] = {}
 
-        basic_keys = [
+        for key in [
             "heat_no",
             "casting_name",
             "customer",
@@ -129,8 +133,7 @@ class ExcelService:
             "doc_ref",
             "issue_no_dt",
             "rev_no_dt",
-        ]
-        for key in basic_keys:
+        ]:
             idx = cmap.get(key)
             if idx is not None and idx < len(columns):
                 mapping[key] = columns[idx]
@@ -190,6 +193,72 @@ class ExcelService:
             col = (mapping.get(f"mech_spec_{mk}") or "").strip()
             if col and col in name_to_idx:
                 cmap["specified_mechanical"][mk] = name_to_idx[col]
+        return cmap
+
+    def _cmap_from_columns(self, columns: List[str]) -> Dict[str, Any]:
+        """Infer a field map directly from column labels."""
+        cmap: Dict[str, Any] = {
+            "chemical": {},
+            "mechanical": {},
+            "specified_chemical": {},
+            "specified_mechanical": {},
+        }
+        lowered = [str(c).strip().lower() for c in columns]
+        basic_terms = {
+            "heat_no": ["heat no", "heat number", "heat_no", "heat"],
+            "casting_name": ["casting name", "item name", "casting_name", "item", "material grade", "grade", "description"],
+            "customer": ["customer", "customer name"],
+            "casting_sl_no": ["casting sl no", "casting serial", "sl no", "serial"],
+            "material_grade": ["material grade", "grade", "material"],
+            "drawing_no": ["drawing no", "drawing number", "drg no", "drg"],
+            "invoice_no_date": ["invoice", "invoice no", "invoice date", "inv no"],
+            "doc_ref": ["doc ref", "document ref", "reference"],
+            "issue_no_dt": ["issue no", "issue date", "issue no/date"],
+            "rev_no_dt": ["rev no", "revision", "rev date", "rev no/date"],
+        }
+        for key, terms in basic_terms.items():
+            for idx, col in enumerate(lowered):
+                if any(term in col for term in terms):
+                    cmap[key] = idx
+                    break
+        for element in CHEMICAL_ELEMENTS:
+            for idx, col in enumerate(lowered):
+                if col == element.lower() or col.startswith(element.lower() + " ") or col.startswith(element.lower() + "("):
+                    cmap["chemical"][element] = idx
+                    break
+        mech_terms = {
+            "tensile": ["tensile", "tensile strength", "uts"],
+            "proof_stress": ["proof", "proof stress", "0.2% proof", "yield"],
+            "elongation": ["elongation", "% elongation"],
+            "hardness_bhn": ["hardness", "bhn", "brinell", "hb"],
+            "impact_individual": ["impact individual", "impact ind", "individual impact", "impact (j)"],
+            "impact_mean": ["impact mean", "mean impact", "avg impact"],
+        }
+        for key, terms in mech_terms.items():
+            for idx, col in enumerate(lowered):
+                if any(term in col for term in terms):
+                    cmap["mechanical"][key] = idx
+                    break
+        for key, terms in mech_terms.items():
+            for idx, col in enumerate(lowered):
+                if any(term in col for term in terms) and key not in cmap["specified_mechanical"]:
+                    cmap["specified_mechanical"][key] = idx
+                    break
+        spec_chem_terms = {
+            "C": ["c max", "c min", "c range", "carbon", "c "],
+            "Si": ["si max", "si min", "si range", "silicon", "si "],
+            "Mn": ["mn max", "mn min", "manganese", "mn "],
+            "P": ["p max", "phosphorus", "p "],
+            "S": ["s max", "sulfur", "sulphur", "s "],
+            "Cu": ["cu max", "copper", "cu "],
+            "Ni": ["ni max", "nickel", "ni "],
+            "Mg": ["mg max", "magnesium", "mg "],
+        }
+        for key, terms in spec_chem_terms.items():
+            for idx, col in enumerate(lowered):
+                if any(term in col for term in terms):
+                    cmap["specified_chemical"][key] = idx
+                    break
         return cmap
 
     def _find_matching_row_with_cmap(
@@ -255,8 +324,9 @@ class ExcelService:
         casting_name: str,
         material_grade: str = "",
         mechanical_requirements_filename: Optional[str] = None,
+        customer_name: str = "",
     ) -> Dict[str, str]:
-        return search_mechanical_specified(casting_name)
+        return search_mechanical_specified(customer_name or casting_name, casting_name)
 
     def preview_with_mapping(
         self,
@@ -309,6 +379,7 @@ class ExcelService:
             resolved_casting,
             resolved_grade,
             mechanical_requirements_filename,
+            customer_name=row_data.get("customer", ""),
         )
 
         api = self.format_search_api_response(row_data, spec_block, mechanical_requirements=mech_specified)
@@ -328,16 +399,24 @@ class ExcelService:
         item_name: str,
         column_mapping: Optional[Dict[str, str]] = None,
     ) -> Tuple[Optional[pd.Series], Optional[pd.DataFrame], Dict[str, Any], str]:
-        det = ColumnDetector()
-        cmap, hr = det.detect(filepath)
-        df = pd.read_excel(filepath, sheet_name=0, header=hr, dtype=object)
-        if column_mapping:
-            cmap = self._cmap_from_column_mapping(df, column_mapping)
+        frames = load_tabular_frames(filepath)
+        if not frames:
+            return None, None, {"chemical": {}, "mechanical": {}, "specified_chemical": {}, "specified_mechanical": {}}, f"No readable tables found in '{os.path.basename(filepath)}'."
 
-        row, err = self._find_matching_row_with_cmap(df, cmap, heat_no, item_name)
-        if row is None:
-            return None, df, cmap, err
-        return row, df, cmap, ""
+        for df in frames:
+            if df is None or df.empty:
+                continue
+            if column_mapping:
+                cmap = self._cmap_from_column_mapping(df, column_mapping)
+            else:
+                cmap = self._cmap_from_columns([str(c).strip() for c in df.columns])
+            row, err = self._find_matching_row_with_cmap(df, cmap, heat_no, item_name)
+            if row is not None:
+                return row, df, cmap, ""
+
+        fallback_df = frames[0]
+        fallback_cmap = self._cmap_from_columns([str(c).strip() for c in fallback_df.columns])
+        return None, fallback_df, fallback_cmap, f"No row matched Heat '{heat_no}' and Casting '{item_name}'."
 
     def search_heat_no(self, filepath: str, heat_no: str, item_name: str = "") -> Dict[str, Any]:
         """Find row by heat (and optional item) for preview / legacy UI."""
@@ -353,14 +432,14 @@ class ExcelService:
         item_name: str = "",
     ) -> Optional[Dict[str, Any]]:
         """
-        Optional limits from a specification workbook. Returns None if file is missing,
-        no row matches, or anything fails — callers treat None as 'no spec data'.
+        Optional limits from a specification workbook or PDF. Returns None if file is missing,
+        no row matches, or anything fails - callers treat None as 'no spec data'.
         """
         try:
             if not spec_path or not os.path.isfile(spec_path):
                 return None
             row_s, df_s, cmap_s, err_s = self._find_matching_row(spec_path, heat_no, item_name or "")
-            if row_s is None:
+            if row_s is None or df_s is None:
                 return None
             schem = cmap_s.get("specified_chemical") or {}
             chem_plain = cmap_s.get("chemical") or {}
@@ -553,20 +632,10 @@ class ExcelService:
         if value is None or str(value).strip() == "":
             return
         value_text = str(value).strip()
-        merged_range = None
         for merged in ws.merged_cells.ranges:
             if address in merged:
-                merged_range = merged
-                break
-
-        if merged_range:
-            min_col = merged_range.min_col
-            min_row = merged_range.min_row
-            anchor = ws.cell(row=min_row, column=min_col)
-            ws.unmerge_cells(str(merged_range))
-            anchor.value = value_text
-            ws.merge_cells(str(merged_range))
-            return
+                ws.cell(row=merged.min_row, column=merged.min_col).value = value_text
+                return
 
         ws[address].value = value_text
 
@@ -605,11 +674,11 @@ class ExcelService:
         mechanical_specified: Optional[Dict[str, str]] = None,
     ) -> Dict[str, str]:
         """Write the test report from preview data. load_workbook preserves template images."""
-        actual_path = os.path.join("uploads", os.path.basename(metallurgy_actual_filename))
+        actual_path = str(BASE_DIR / "uploads" / os.path.basename(metallurgy_actual_filename))
         if not os.path.isfile(actual_path):
             raise FileNotFoundError("Metallurgy actual file not found.")
 
-        template_path = os.path.join("uploads", os.path.basename(template_filename))
+        template_path = str(BASE_DIR / "uploads" / os.path.basename(template_filename))
         if not os.path.isfile(template_path):
             raise FileNotFoundError("Test Report template not found.")
 
@@ -647,7 +716,6 @@ class ExcelService:
 
         wb = load_workbook(template_path, keep_links=True)
         ws = wb.active
-        _replace_cover_logo(ws, os.path.join(str(BASE_DIR), "company_logo.png"))
 
         basic_fallback = row_fallback if isinstance(row_fallback, dict) else {}
 
@@ -703,8 +771,9 @@ class ExcelService:
                 self._set_cell_value_only(ws, act_cell, pair[1])
 
         out_name = f"MTR_{uuid.uuid4().hex[:10]}.xlsx"
-        out_path = os.path.join("outputs", out_name)
-        os.makedirs("outputs", exist_ok=True)
+        out_path = str(BASE_DIR / "outputs" / out_name)
+        os.makedirs(str(BASE_DIR / "outputs"), exist_ok=True)
         wb.save(out_path)
         return {"output_filename": out_name, "output_path": out_path}
+
 
