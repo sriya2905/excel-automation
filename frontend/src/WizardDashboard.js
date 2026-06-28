@@ -492,7 +492,7 @@ function GenerateStep({ state, busy, onBack, onGenerate }) {
           <div style={reviewCardTitleStyle}>Files ready for generation</div>
           <ul style={reviewListStyle}>
             <li>
-              <strong>Metallurgy Excel:</strong> {state.files.metallurgyFilename || '-'}
+              <strong>Metallurgy File:</strong> {state.files.metallurgyFilename || '-'}
             </li>
             <li>
               <strong>SGIL Template:</strong> {state.files.templateFilename || '-'}
@@ -590,7 +590,7 @@ export default function WizardDashboard({ username, onLogout }) {
       if (!isAllowedUpload(file, validators[kind] || [])) {
         setError(
           kind === 'metallurgy'
-            ? 'Metallurgy Sheet must be .xls or .xlsx.'
+            ? 'Metallurgy Source must be .xls or .xlsx.'
             : 'This file must be .xlsx.',
         );
         if (inputEl) inputEl.value = '';
@@ -707,7 +707,7 @@ export default function WizardDashboard({ username, onLogout }) {
 
   const generateReport = useCallback(async () => {
     if (!report.files.templateFilename || !report.files.metallurgyFilename || !report.files.mechReqFilename) {
-      setError('Metallurgy Excel, mechanical requirements, and SGIL template are required.');
+      setError('Metallurgy File, mechanical requirements, and SGIL template are required.');
       return;
     }
 
@@ -795,7 +795,7 @@ export default function WizardDashboard({ username, onLogout }) {
             <div style={uploadEyebrowStyle}>Step 2 of 4</div>
             <h2 style={uploadTitleStyle}>Upload Data Files</h2>
             <p style={uploadSubtitleStyle}>
-              Add the three required Excel files, then proceed to search and preview your report.
+              Add the required source files, then proceed to search and preview your report.
             </p>
           </div>
         </div>
@@ -803,11 +803,11 @@ export default function WizardDashboard({ username, onLogout }) {
         <div style={uploadGridStyle}>
           <UploadCard
             accent="#2563eb"
-            title="Metallurgy Sheet"
-            description="Required source data for actual chemistry and mechanical values."
+            title="Metallurgy Source"
+            description="Required source data for actual chemistry and mechanical values. PDF or Excel is supported."
             filename={report.files.metallurgyFilename}
             inputRef={metalInputRef}
-            accept=".xls,.xlsx"
+            accept=".xls,.xlsx,.pdf"
             buttonLabel="Choose File"
             onOpenPicker={() => metalInputRef.current?.click()}
             onPick={(e) => uploadFile('metallurgy', e.target.files?.[0], e.target)}
@@ -821,7 +821,7 @@ export default function WizardDashboard({ username, onLogout }) {
             description="Required template that keeps the original logo and layout."
             filename={report.files.templateFilename}
             inputRef={templateInputRef}
-            accept=".xlsx"
+            accept=".xlsx,.xls,.pdf"
             buttonLabel="Choose File"
             onOpenPicker={() => templateInputRef.current?.click()}
             onPick={(e) => uploadFile('template', e.target.files?.[0], e.target)}
@@ -831,11 +831,11 @@ export default function WizardDashboard({ username, onLogout }) {
 
           <UploadCard
             accent="#047857"
-            title="Mechanical Properties Requirement"
-            description="Required specified tensile, proof stress, elongation, hardness and impact limits."
+            title="Mechanical Requirements Source"
+            description="Required specified tensile, proof stress, elongation, hardness and impact limits. PDF or Excel is supported."
             filename={report.files.mechReqFilename}
             inputRef={mechReqInputRef}
-            accept=".xlsx"
+            accept=".xlsx,.xls,.pdf"
             buttonLabel="Choose File"
             onOpenPicker={() => mechReqInputRef.current?.click()}
             onPick={(e) => uploadFile('mechanical', e.target.files?.[0], e.target)}
